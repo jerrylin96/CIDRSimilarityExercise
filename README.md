@@ -9,3 +9,5 @@ I chose to use an upper triangular matrix to represent the data because the matr
 1 means adjacent
 2 means intersecting
 3 means contained
+
+In the test text file data, each line is a CIDR block. These were all randomly generated using the fakedata() function in my code.
