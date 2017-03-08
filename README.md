@@ -1,1 +1,2 @@
 # CIDRSimilarityExercise
+I was originally programming this exercise in Java, but switched to R for several reasons. The first was the time constraint; I was not able to work on this for the past two weeks, so I wanted to get it out as soon as possible. The second was the fact that R is vectorized and I can take advantage of the various "apply" functions at my disposal. Lastly, I wanted to take advantage of the data visualization tools and packages in R.
