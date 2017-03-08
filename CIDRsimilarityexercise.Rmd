@@ -1,0 +1,227 @@
+---
+title: "Cisco"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("ggplot2")
+install.packages("plyr")
+library(ggplot2)
+library(plyr)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+options(scipen = 999) #Removes annoying scientific notation
+ex1 = c("10.10.0.0/16", "10.20.0.0/16", "192.168.5.0/24")
+ex2 = c("10.0.0.0/8", "192.168.5.127/25")
+boop = list(ex1, ex2) #input form for final function called checker
+
+bcon = function(dec){ #converts decimal to binary
+  dec = as.numeric(dec) #makes sure argument is a number
+  if(dec<2){ #base case
+    return(dec) #returns itself since 0->0, 1->1
+  } 
+  return(bcon(dec%%2) + bcon(dec%/%2)*10)
+} #tree recursion that separates remainders and divisors
+
+dcon = function(bin){ #converts binary to decimal
+  sum = 0             #initializes total
+  len = nchar(bin)-1  #sets upper limit of range of powers of 2
+  bin = as.numeric(bin) #makes sure argument is number
+  for(i in 0:len){
+    sum = sum + (bin%%10)*(2^i) #adds 1 or 0 times 2 to the power
+    bin = bin%/%10
+  }
+  return(sum)
+}
+
+eighter = function(bacon){ #ensures 8 bit sets
+  if(nchar(bacon)==8){
+    return(bacon)
+  }
+  return(eighter(paste("0", sep = "", bacon)))
+}
+
+joiner = function(ipstr, con){ #(func from dec to bin and bin to dec)
+  res = integer()
+  int = (nchar(gsub("[0-9]", "", ipstr)) + 1)
+  p1 = gsub("[/.]", "!", ipstr) # ! symbol better for regex 
+  p2 = strsplit(p1, "!") # uses ! as delimiter
+  for(i in 1:length(p2)){
+    p2[[i]] = sapply(p2[[i]], con)
+    if(identical(bcon, con)){
+      p2[[i]] = sapply(p2[[i]], eighter)
+    }
+  }
+  p3 = sapply(p2, paste, collapse = ".")
+  return(p3)
+}
+
+hostsplitter = function(cidr){
+  work = list()
+  bite = as.numeric(sub(".*/", "", cidr)) # bits in network address
+  left = sub("/.*", "", cidr) #actual IP address
+  vers = (nchar(gsub("[0-9]", "", left)) + 1)*8 #ipv4 or ipv6
+  gull = joiner(left, bcon)
+  full = gsub("[/.]", "", gull)
+  netw = substr(full, 1, bite)
+  host = substr(full, bite + 1, nchar(full))
+  work[[1]] = netw # network portion
+  work[[2]] = host # host portion
+  work[[3]] = cidr # original
+  work[[4]] = left # ip address without the / part
+  work[[5]] = bite # number of bits in network part of address
+  work[[6]] = gull # binary and periods
+  work[[7]] = full # binary no periods
+  names(work) = c("network", "host", "cidr", "address", "netbits", "classfull", "classless" )
+  return(netw) #decided to only return network portion and ignore everything else, easily changed
+}
+
+content = function(a, b){ #checks to see if one contains the other
+  if(grepl(a, b)){ #checks to see if present
+    return(regexpr(a, b)==1) #checks to see if at beginning
+  } 
+  if(grepl(b, a)){ #no account for direction
+    return(regexpr(b, a)==1) 
+  } 
+  return(FALSE)
+}
+adjacent = function(a, b){ #checks for pairwise adjacency
+  if(nchar(a)!=nchar(b)){
+    return(FALSE)
+  }
+  bigger = substr(a, 1, nchar(a) - 1)
+  if(content(bigger, b)){
+    x = as.numeric(substr(a, nchar(a), nchar(a))) #last element in network portion
+    y = as.numeric(substr(b, nchar(b), nchar(b))) #last element in network portion
+    return(x+y==1) #one has to end in zero the other has to end in one
+  } 
+  return(FALSE)
+}
+status = function(a, b){ #checks using adjacent or content function
+  if(content(a, b)){
+    return("C") #contained
+  }
+  if(adjacent(a, b)){
+    return("A") #adjacent
+  }
+  return("N") #none
+}
+
+vecC = function(a){ #use to check along a single row or column of pairwise matrix
+  return(grepl("C", a))
+}
+vecN = function(a){ #checks for no relationship 
+  return(grepl("N", a))
+}
+vecA = function(a){ #checks for adjacency
+  return(grepl("A", a))
+}
+
+pairwise = function(x, y){ #checks status between two blocks pairwise
+  neo = matrix(nrow = length(x), ncol = length(y))
+  for(i in 1:length(x)){
+    neo[i,] = sapply(y, status, b = x[i])
+  }
+  p1 = apply(neo, 2, vecN) #True/False Matrix for nones
+  if(sum(p1)==length(p1)){ #everything in matrix is "N"
+    return("N")
+  }
+  p2 = apply(neo, 2, vecC) #True/False Matrix for containment
+  if(is.null(dim(p2))){
+    rowcheck = as.logical(sum(p2))
+    colcheck = as.logical(sum(p2))
+  }else{
+  rowcheck = sum(as.logical(apply(p2, 1, sum)))==nrow(p2) #sums along rows, converts to boolean, checks if number of true values = number of rows
+  colcheck = sum(as.logical(apply(p2, 2, sum)))==ncol(p2) #sums along columns, converts to boolean, checks if number of true values = number of columns
+  }
+  if(rowcheck|colcheck){
+    return("C")
+  }
+  p3 = apply(neo, 2, vecA)
+  if(is.null(dim(p3))){
+    adjcheck = as.logical(sum(p3))
+  }else{
+    adjcheck = as.logical(sum(as.logical(apply(p3, 1, sum)))) #sums along rows, converts to boolean, checks if any are adjacent
+  }
+  if(adjcheck){
+    return("A")
+  }
+  return("I") #if not none, containing, or adjacent, then intersection
+}
+
+checker = function(blocks){ #takes a list of n blocks and outputs matrix
+  for(k in 1:length(blocks)){
+    blocks[[k]] = hostsplitter(blocks[[k]])
+  }
+  ans = matrix(nrow = length(blocks), ncol = length(blocks))
+  for(i in 1:length(blocks)){
+    for(j in 1:length(blocks)){
+      ans[i,j] = pairwise(blocks[[i]], blocks[[j]])  
+    }
+  }
+  return(ans)
+}
+
+
+checker(blocks)
+
+
+blocks[[1]] = ex1
+blocks[[2]] = ex2
+y = checker(blocks)
+```
+
+## Creating sample data
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+ipgen = function(){
+  x = paste0(as.character(sample(1:255, 4)), collapse = ".") #ip
+  h = as.character(sample(1:32, 1)) #bits in network
+  return(paste(x, h, sep = "/"))
+}
+blockgen = function(){
+  block = character()
+  len = sample(1:10, 1) #limiting max size to 10, but I can change this later
+  for(i in 1:len){
+    block[i] = ipgen()
+  }
+  return(block)
+}
+fakedata = function(){
+  testing = list()
+  n = sample(1:30, 1) #limiting max number of blocks to 30, but I can change this later
+  for(i in 1:n){
+    testing[[i]] = blockgen()
+  }
+  return(testing)
+}
+blocks = fakedata()
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+apples = y
+apples = revalue(apples, c("N" = 0))
+apples = revalue(apples, c("A" = 1))
+apples = revalue(apples, c("I" = 2))
+apples = revalue(apples, c("C" = 3))
+class(apples) = "numeric"
+apples[lower.tri(apples)] = NA
+image(1:nrow(apples), 1:ncol(apples), apples, xlab = "block number", ylab = "block number")
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
