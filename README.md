@@ -14,6 +14,8 @@ In the test text file data, each line is a CIDR block. These were all randomly g
 
 The input for the final function, pepper, is a list of blocks of IP addresses in CIDR notation in character string format. The output is the plot.
 
+In addition to taking in a list of blocks as an input, pepper also takes in a random string as it's second argument (so as to distinguish the graphs from each other). 
+
 An example input list would look like:
 
 [[1]]
